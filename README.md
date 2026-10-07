@@ -3,6 +3,8 @@
 Your private production desk for **Walter's Home Check** and **Chef Sal Romano**.
 Plan videos on a board, make the Project Crafter prompt in one click, build perfect
 YouTube descriptions with the right product links, and tick off the publish checklist.
+Plan the Shorts you cut from each video, test titles and thumbnail text, and look back
+at every week.
 
 - Works in the browser — nothing to install on a server.
 - Your data stays **only on your device**. Nothing is sent anywhere. No accounts, no tracking.
@@ -64,8 +66,9 @@ a Dock icon.
 
 ### Video page (tabs)
 - **Overview** — working title, title options A/B/C (orange warning above 70 characters),
-  thumbnail text (red warning if it repeats words from the title), main product, length and
-  spoken-word target, publish date/time (ET), stage.
+  thumbnail text (red warning when half or more of its words are in the title, orange when it
+  shares one), main product, length and spoken-word target, publish date/time (ET), stage.
+- **Title lab** — see the next section.
 - **Crafter prompt** — fields are pre-filled from your defaults. Type the points/segments one
   per line. Press **Copy prompt**. The last line `create me a prompt for the video` is always
   added automatically and can't be changed. There is no SOURCES section.
@@ -75,10 +78,75 @@ a Dock icon.
   Below it: the **pinned comment** and **community post**, and the **"Insert a product line
   into an old description"** helper — paste an old description, pick the product, press
   **Insert line**, check the green line, then **Copy new description**.
-- **Checklist** — tick items as you publish. "Description copied" ticks itself.
+- **Shorts** — see "Shorts" below.
+- **Checklist** — tick items as you publish. "Description copied" ticks itself, and so does
+  "Shorts cut from this video" once a Short is marked Cut or Posted.
 - **Notes** — free text plus links to the script doc, Headcast project and thumbnail file.
 
 Every "Export to file" button saves the text as a `.txt` file.
+
+### Title lab (tab on each video)
+
+![Title lab](docs/screens/desktop-v2-01-title-lab.png)
+
+- **Title scores** — each title option A/B/C gets a score out of 100, and every point is
+  explained underneath, so you can see exactly why:
+
+  | Rule | Points |
+  |---|---|
+  | Length 40–65 characters (30–39 or 66–75 gets half) | 20 |
+  | Has a number ("7 Things") | 15 |
+  | Has a curiosity/pain word (never, mistake, hidden, …) | 15 |
+  | Starts strong — not "How I…", "In this video…", "In today's video…", "This video…" | 15 |
+  | At most 2 ALL CAPS words | 10 |
+  | No clickbait words ("shocking", "you won't believe", …) — red warning | 10 |
+  | Has one of the channel's keywords | 15 |
+
+  The word lists are in **Settings → Title lab**: channel keywords (Walter: home inspection,
+  house, homeowner, buying a house, winter, basement, roof; Sal: restaurant, chef, copycat,
+  recipe, menu, Italian), curiosity/pain words and clickbait words. Each has a **Reset** button.
+- **Thumbnail text** — 2–5 words; red when 50% or more of its words are in the title; red when
+  it doesn't fit **2 lines of 20 characters**. The round button picks which option is shown in
+  the **preview**: a mock thumbnail at real YouTube sizes (246×138 and 360×202) in the
+  channel's colors with a host-photo placeholder, so you can judge readability.
+- **A/B log** — press **+ Add test row** when a title/thumbnail goes live. Type the start date,
+  what ran, and the CTR % and views after 48 hours and after 7 days (from YouTube Studio
+  "Test & compare" or Analytics). The winner is the row you tick, otherwise the best 7-day CTR
+  (then 48-hour CTR, then views).
+
+### Shorts
+
+![Shorts tab](docs/screens/desktop-v2-03-shorts-tab.png)
+
+- On each video's **Shorts** tab, plan up to **5 Shorts**. For each one: hook line (first 2
+  seconds, max 12 words), source time range like `1:05–1:50` (must be **15–60 seconds**; the
+  length is shown), on-screen text (max 6 words), title (max 100 characters; orange warning if
+  it has no word from the long video's title), description with a link line (default: the free
+  PDF), status **Planned / Cut / Posted**, and the post date. **Copy title** and
+  **Copy description** are on each Short.
+- **Generate Shorts plan** — paste the chapter list (or press **Use chapters from Description**),
+  press **Propose Shorts**: one Short per chapter, titled after the chapter, from the chapter
+  start to the next chapter or 45 seconds, whichever comes first. Untick the ones you don't
+  want and press **Add selected Shorts**.
+- The **Shorts** page (bottom/top menu) shows every Short in Planned / Cut / Posted columns,
+  with a status menu on each card, a status filter, and a **week strip** (Mon–Sun) showing
+  Shorts on their post date. The Walter/Sal/Both switch works here too.
+
+### Week (weekly review)
+
+![Weekly review](docs/screens/desktop-v2-05-weekly-review.png)
+
+- What was **published this week** per channel (videos and Shorts), what's **coming up in
+  the next 14 days**, and cards **stuck in the same stage for more than 7 days** (published
+  videos and scheduled ones with a date don't count). Use ‹ › to look at other weeks.
+- **Notes for the week** — "What worked" and "What to try next", saved per week
+  (ISO weeks, Monday to Sunday).
+- **Stats** — type each published video's numbers for the week (views, watch hours, subs
+  gained, CTR %, Payhip sales). A small line per channel shows the last 8 weeks; pick the number
+  to follow under **Trend** (CTR is averaged, the others are added up).
+
+> Cards made before this update don't know when they entered their stage, so the "stuck" list
+> uses their last edit date until they are moved once.
 
 ### Calendar and Topics
 - **Calendar** — month view of scheduled (outlined) and published (solid) videos. Click one to open it.
@@ -94,7 +162,15 @@ Every "Export to file" button saves the text as a `.txt` file.
 ## 5. Back up your data (do this weekly)
 
 **Settings → Backup → Export backup file.** A file like
-`channel-studio-backup-2026-10-07.json` is downloaded. Keep it in iCloud Drive or Google Drive.
+`channel-studio-backup-2026-10-07.json` is downloaded. It has everything: videos, Shorts, A/B
+log, weekly notes, stats and settings. Keep it in iCloud Drive or Google Drive.
+
+**Settings → Backup → Export CSV files (.zip)** downloads `channel-studio-csv-<date>.zip`
+with one spreadsheet file per table — `videos.csv`, `shorts.csv`, `ab_log.csv`,
+`weekly_notes.csv`, `stats.csv` — for Numbers, Excel or Google Sheets. This is for reading
+and analysis; to restore data, use the backup file.
+
+Backup files made before this update still import fine (they just have no Shorts or stats).
 
 To restore (or move to another device): **Settings → Backup → Import backup** and pick the file.
 This **replaces everything** in the app with what's in the file.
@@ -127,8 +203,10 @@ Changes save automatically. They only change **this device** (back up and import
 ## 7. Self-tests
 
 Open **https://plazzers.github.io/channel-studio/tests/tests.html**. It checks the prompt
-format, chapter rules, the description builder, the insert helper and the similar-topic
-check. Everything should show green ✓.
+format, chapter rules, the description builder, the insert helper, the similar-topic check,
+Shorts time ranges, the chapters → Shorts generator, title scoring, the thumbnail rules, the
+A/B winner, ISO week math, CSV, the ZIP writer and the database upgrade (old data kept).
+Everything should show green ✓.
 
 ![Self-tests](docs/screens/desktop-17-self-tests.png)
 
@@ -136,12 +214,19 @@ check. Everything should show green ✓.
 
 ## For a developer (optional)
 
-- Plain HTML + CSS + JavaScript modules, no build step. Data is in IndexedDB.
-- `data/channels.js` holds the default channel settings, `data/seed.js` the starter videos,
-  `js/logic.js` all the rules (tested by `tests/tests.html`).
-- If you change app files, bump `VERSION` in `sw.js` so installed copies refresh their offline files.
-- Full browser check (desktop 1440×900 and phone 390×844) with Playwright:
-  `node tests/e2e.cjs` (writes screenshots to `docs/screens/`).
+- Plain HTML + CSS + JavaScript modules, no build step, no libraries. Data is in IndexedDB.
+- `data/channels.js` holds the default channel settings (incl. title keywords), `data/seed.js`
+  the starter videos, `js/logic.js` all the rules (tested by `tests/tests.html`),
+  `js/zip.js` a minimal store-only ZIP writer (+ CRC-32), `js/export.js` the CSV tables.
+- Database version 2 (`js/db.js`) only **adds** stores — `shorts`, `abtests`, `weekly`,
+  `stats` — next to the original `videos` and `kv`; nothing old is changed. Videos get an
+  optional `statusSince` field; channels an optional `keywords` list (filled from the defaults
+  when missing). Backup files are version 2; version 1 files are still accepted.
+- If you change app files, bump `VERSION` in `sw.js` (now `cs-v2`) so installed copies refresh
+  their offline files.
+- Full browser check (desktop 1440×900 and phone 390×844, plus an upgrade run on top of a
+  version-1 database) with Playwright: `node tests/e2e.cjs` (writes screenshots to
+  `docs/screens/`; the CSV zip is opened with Python by `tests/check_zip.py`).
 
 ### Screenshots
 | Desktop | Phone |
@@ -150,3 +235,7 @@ check. Everything should show green ✓.
 | ![](docs/screens/desktop-07-description.png) | ![](docs/screens/phone-07-description.png) |
 | ![](docs/screens/desktop-11-calendar.png) | ![](docs/screens/phone-11-calendar.png) |
 | ![](docs/screens/desktop-15-board-dark.png) | ![](docs/screens/phone-15-board-dark.png) |
+| ![](docs/screens/desktop-v2-02-ab-log.png) | ![](docs/screens/phone-v2-01-title-lab.png) |
+| ![](docs/screens/desktop-v2-04-shorts-board.png) | ![](docs/screens/phone-v2-04-shorts-board.png) |
+| ![](docs/screens/desktop-v2-07-export.png) | ![](docs/screens/phone-v2-05-weekly-review.png) |
+| ![](docs/screens/desktop-v2-08-title-lab-dark.png) | ![](docs/screens/phone-v2-09-weekly-review-dark.png) |

@@ -204,7 +204,7 @@ async function moveVideo(id, status, beforeId) {
     order = (prev + next) / 2;
   }
   const changed = v.status !== status;
-  v.status = status;
+  store.setStatus(v, status);
   v.order = order;
   await store.saveVideo(v, { silent: true });
   drawColumns();

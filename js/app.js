@@ -9,8 +9,10 @@ import * as detail from './views/detail.js';
 import * as calendar from './views/calendar.js';
 import * as topics from './views/topics.js';
 import * as settings from './views/settings.js';
+import * as shorts from './views/shorts.js';
+import * as week from './views/week.js';
 
-const routes = { board, video: detail, calendar, topics, settings };
+const routes = { board, video: detail, calendar, topics, settings, shorts, week };
 const view = $('#view');
 let current = null;
 

@@ -1,7 +1,7 @@
 // Offline support: keeps a copy of the app files on the device.
 // Bump VERSION whenever app files change so devices pick up the update.
 
-const VERSION = 'cs-v1';
+const VERSION = 'cs-v2';
 const FILES = [
   './',
   './index.html',
@@ -10,14 +10,20 @@ const FILES = [
   './js/app.js',
   './js/ctx.js',
   './js/db.js',
+  './js/export.js',
   './js/logic.js',
   './js/store.js',
   './js/util.js',
+  './js/zip.js',
   './js/views/board.js',
   './js/views/calendar.js',
   './js/views/detail.js',
+  './js/views/lab.js',
   './js/views/settings.js',
+  './js/views/shorts-tab.js',
+  './js/views/shorts.js',
   './js/views/topics.js',
+  './js/views/week.js',
   './data/channels.js',
   './data/seed.js',
   './icons/icon.svg',

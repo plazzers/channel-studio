@@ -1,4 +1,4 @@
-// Video detail: Overview · Crafter prompt · Description · Checklist · Notes
+// Video detail: Overview · Title lab · Crafter prompt · Description · Shorts · Checklist · Notes
 
 import * as store from '../store.js';
 import { ui } from '../ctx.js';
@@ -20,16 +20,21 @@ import {
   insertProductLine,
   diffLines,
   checkThumbText,
+  thumbOverlap,
   fillTemplate,
   videoTitle,
 } from '../logic.js';
 import { $, $$, esc, toast, copyText, downloadText, slug, debounce } from '../util.js';
 import { similarHtml } from './board.js';
+import { renderLab } from './lab.js';
+import { renderShortsTab } from './shorts-tab.js';
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
+  { id: 'lab', label: 'Title lab' },
   { id: 'prompt', label: 'Crafter prompt' },
   { id: 'description', label: 'Description' },
+  { id: 'shorts', label: 'Shorts' },
   { id: 'checklist', label: 'Checklist' },
   { id: 'notes', label: 'Notes' },
 ];
@@ -72,13 +77,15 @@ export function render(el, r) {
     </section>`;
   panel = $('#panel', el);
   $('#d-status', el).addEventListener('change', (e) => {
-    v.status = e.target.value;
+    store.setStatus(v, e.target.value);
     touch();
     const ov = $('#ov-status');
     if (ov) ov.value = v.status;
     toast(`Stage: ${STATUSES.find((s) => s.id === v.status).label}`);
   });
-  ({ overview, prompt, description, checklist, notes })[tab]();
+  const lab = () => renderLab(panel, v, c, touch);
+  const shorts = () => renderShortsTab(panel, v, c, { touch, descriptionText, params: r.params });
+  ({ overview, lab, prompt, description, shorts, checklist, notes })[tab]();
 }
 
 export function cleanup() {
@@ -114,7 +121,7 @@ function overview() {
             .join('')}
         </fieldset>
         <h2>Thumbnail text</h2>
-        <p class="hint">2–5 words each. It must not repeat words from the title.</p>
+        <p class="hint">2–5 words each. It must not repeat words from the title. See it at real size in the <a href="#/video/${esc(v.id)}/lab">Title lab</a>.</p>
         <div id="ov-thumbs"></div>
         <button type="button" class="btn small" id="ov-addthumb">+ Add thumbnail option</button>
       </div>
@@ -173,12 +180,16 @@ function overview() {
     box.innerHTML = v.thumbTexts
       .map((t, i) => {
         const r = checkThumbText(t, titles());
+        const o = thumbOverlap(t, titles());
         let msg = '';
         let cls = '';
         if (!r.empty) {
-          if (r.repeats.length) {
+          if (o.level === 'bad') {
             cls = 'bad';
-            msg = `Repeats words from the title: ${r.repeats.join(', ')}. Thumbnail text must differ from the title.`;
+            msg = `Repeats words from the title: ${r.repeats.join(', ')} (${Math.round(o.ratio * 100)}%). Thumbnail text must differ from the title.`;
+          } else if (o.level === 'warn') {
+            cls = 'warn';
+            msg = `Shares a word with the title: ${o.repeats.join(', ')}. Try a different word.`;
           } else if (r.tooShort || r.tooLong) {
             cls = 'warn';
             msg = `${r.words} word${r.words === 1 ? '' : 's'} — use 2–5 words.`;
@@ -273,7 +284,7 @@ function overview() {
     touch();
   });
   $('#ov-status', panel).addEventListener('change', (e) => {
-    v.status = e.target.value;
+    store.setStatus(v, e.target.value);
     $('#d-status').value = v.status;
     touch();
   });
@@ -284,6 +295,7 @@ function overview() {
     v.pinned = null;
     v.community = null;
     await store.saveVideo(v, { silent: true });
+    await store.videoChannelChanged(v);
     toast('Channel changed — pick the product again');
     window.dispatchEvent(new HashChangeEvent('hashchange'));
   });
@@ -407,7 +419,7 @@ function prompt() {
   const copy = async () => {
     const ok = await copyText(promptText());
     if (ok && v.status === 'idea') {
-      v.status = 'prompt';
+      store.setStatus(v, 'prompt');
       $('#d-status').value = 'prompt';
       touch();
     }

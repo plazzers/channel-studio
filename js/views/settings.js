@@ -1,13 +1,17 @@
-// Settings: channel config, prompt defaults, checklist, backup, theme.
+// Settings: channel config, prompt defaults, title lab words, checklist,
+// backup (JSON + CSV zip), theme.
 
 import * as store from '../store.js';
 import { ui } from '../ctx.js';
-import { formatProductLine } from '../logic.js';
+import { formatProductLine, wordList, DEFAULT_TITLE_WORDS } from '../logic.js';
 import { $, $$, esc, toast, downloadText, debounce, pref, todayISO } from '../util.js';
+import { csvZip, downloadBytes } from '../export.js';
+import { DEFAULT_CHANNELS } from '../../data/channels.js';
 
 const SECTIONS = [
   { id: 'channel', label: 'Channel & products' },
   { id: 'prompt', label: 'Prompt defaults' },
+  { id: 'lab', label: 'Title lab' },
   { id: 'checklist', label: 'Checklist' },
   { id: 'backup', label: 'Backup' },
   { id: 'theme', label: 'Theme' },
@@ -26,6 +30,7 @@ const PROMPT_KEYS = [
 let editCh = null;
 const saveChannels = debounce(() => store.saveChannels(), 300);
 const saveChecklist = debounce(() => store.saveChecklist(), 300);
+const saveTitleWords = debounce(() => store.saveTitleWords(), 300);
 
 export function render(el, r) {
   const sec = SECTIONS.some((s) => s.id === r.params.s) ? r.params.s : 'channel';
@@ -39,7 +44,7 @@ export function render(el, r) {
       <div id="st-body"></div>
     </section>`;
   const body = $('#st-body', el);
-  ({ channel: channelSec, prompt: promptSec, checklist: checklistSec, backup: backupSec, theme: themeSec })[sec](body);
+  ({ channel: channelSec, prompt: promptSec, lab: labSec, checklist: checklistSec, backup: backupSec, theme: themeSec })[sec](body);
 }
 
 function chPicker() {
@@ -208,6 +213,58 @@ function promptSec(body) {
   });
 }
 
+/* ---------------- Title lab words ---------------- */
+
+function labSec(body) {
+  const fresh = body.cloneNode(false);
+  body.replaceWith(fresh);
+  body = fresh;
+  const c = store.channel(editCh);
+  const tw = store.state.titleWords;
+  const lines = (list) => esc((list || []).join('\n'));
+  body.innerHTML = `
+    ${chPicker()}
+    <div class="grid2">
+      <div class="panel" data-ch="${c.id}">
+        <div class="panel-head"><h2>Keywords — ${esc(c.name)}</h2><button type="button" class="btn small" data-lreset="keywords">Reset</button></div>
+        <p class="hint">A title scores points when it has one of these. Shorts titles are checked against the long video's title instead. One per line.</p>
+        <label class="field"><span class="sr">Channel keywords</span><textarea id="lab-keywords" rows="8">${lines(c.keywords)}</textarea></label>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>Curiosity / pain words</h2><button type="button" class="btn small" data-lreset="power">Reset</button></div>
+        <p class="hint">Used for both channels. One word or phrase per line ("mistake" also matches "mistakes").</p>
+        <label class="field"><span class="sr">Curiosity and pain words</span><textarea id="lab-power" rows="8">${lines(tw.power)}</textarea></label>
+        <div class="panel-head"><h2>Clickbait words (warning)</h2><button type="button" class="btn small" data-lreset="clickbait">Reset</button></div>
+        <label class="field"><span class="sr">Clickbait words</span><textarea id="lab-clickbait" rows="5">${lines(tw.clickbait)}</textarea></label>
+      </div>
+    </div>`;
+  bindPicker(body, labSec);
+  body.addEventListener('input', (e) => {
+    const id = e.target.id;
+    if (id === 'lab-keywords') {
+      c.keywords = wordList(e.target.value);
+      saveChannels();
+    } else if (id === 'lab-power' || id === 'lab-clickbait') {
+      tw[id.slice(4)] = wordList(e.target.value);
+      saveTitleWords();
+    }
+  });
+  body.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-lreset]');
+    if (!b) return;
+    const k = b.dataset.lreset;
+    if (k === 'keywords') {
+      c.keywords = [...(DEFAULT_CHANNELS[c.id]?.keywords || [])];
+      store.saveChannels();
+    } else {
+      tw[k] = [...DEFAULT_TITLE_WORDS[k]];
+      store.saveTitleWords();
+    }
+    labSec(body);
+    toast('Reset to the starting list');
+  });
+}
+
 /* ---------------- Checklist ---------------- */
 
 function checklistSec(body) {
@@ -262,8 +319,13 @@ function backupSec(body) {
     <div class="grid2">
       <div class="panel">
         <h2>Export backup</h2>
-        <p>Saves everything (videos, products, prompt defaults, checklist) into one file. Do this every week and keep the file in iCloud Drive or Google Drive.</p>
+        <p>Saves everything (videos, Shorts, A/B log, weekly notes, stats, products, prompt defaults, checklist) into one file. Do this every week and keep the file in iCloud Drive or Google Drive.</p>
         <button type="button" class="btn primary" id="bk-export">Export backup file</button>
+      </div>
+      <div class="panel">
+        <h2>Export for spreadsheets</h2>
+        <p>One .zip with a CSV file per table: videos, Shorts, A/B log, weekly notes and stats. Opens in Numbers, Excel or Google Sheets. (This is for reading — to restore, use the backup file.)</p>
+        <button type="button" class="btn" id="bk-csv">Export CSV files (.zip)</button>
       </div>
       <div class="panel">
         <h2>Import backup</h2>
@@ -279,12 +341,16 @@ function backupSec(body) {
       <div class="panel">
         <h2>Where is my data?</h2>
         <p>Only in this browser on this device. Nothing is sent anywhere. Another computer or phone has its own separate copy — move data with Export/Import.</p>
-        <p class="muted">${store.state.videos.length} videos saved here.</p>
+        <p class="muted">${store.state.videos.length} videos, ${store.state.shorts.length} Shorts saved here.</p>
       </div>
     </div>`;
   $('#bk-export', body).addEventListener('click', () => {
     downloadText(`channel-studio-backup-${todayISO()}.json`, JSON.stringify(store.exportData(), null, 2), 'application/json');
     toast('Backup file saved');
+  });
+  $('#bk-csv', body).addEventListener('click', () => {
+    downloadBytes(`channel-studio-csv-${todayISO()}.zip`, csvZip(), 'application/zip');
+    toast('CSV files saved (.zip)');
   });
   $('#bk-import', body).addEventListener('change', async (e) => {
     const file = e.target.files[0];
@@ -306,7 +372,7 @@ function backupSec(body) {
       return;
     }
     const when = data.exportedAt ? new Date(data.exportedAt).toLocaleString() : 'unknown date';
-    if (!confirm(`Replace everything with this backup?\n\n${data.videos.length} videos, saved ${when}.`)) return;
+    if (!confirm(`Replace everything with this backup?\n\n${data.videos.length} videos, ${(data.shorts || []).length} Shorts, saved ${when}.`)) return;
     await store.importData(data);
     toast(`Backup restored — ${data.videos.length} videos`);
   });

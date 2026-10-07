@@ -22,6 +22,7 @@ export const DEFAULT_CHANNELS = {
     lineFormat: '{text} 👉 {url}',
     hashtags: '#homeinspection #homeowner #homemaintenance',
     signOff: 'New videos every week. Take care of your home.',
+    keywords: ['home inspection', 'house', 'homeowner', 'buying a house', 'winter', 'basement', 'roof'],
     pitchRule:
       'Free checklist is always "the first link in the description". Pitch one main product, low-key, once mid-video and once at the end.',
     products: [
@@ -116,6 +117,7 @@ export const DEFAULT_CHANNELS = {
     lineFormat: '{emoji} {text} → {url}',
     hashtags: '#restaurantsecrets #chef #eatingout',
     signOff: 'New videos every week. Mangia bene.',
+    keywords: ['restaurant', 'chef', 'copycat', 'recipe', 'menu', 'Italian'],
     pitchRule:
       'Copycat/chain videos → Copycat Cookbook + App. Italian cooking or "what Sal orders" → Italian Kitchen. Free PDF always mentioned mid-video.',
     products: [

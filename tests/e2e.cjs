@@ -7,6 +7,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { execFileSync } = require('child_process');
 const { chromium } = require('playwright');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -67,10 +68,12 @@ async function runSize(browser, name, viewport, phone) {
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('dialog', (d) => d.accept());
   const shot = async (n, opts = {}) => {
-    // Sticky bars repeat in stitched full-page shots; flatten them just for the picture.
-    const tag = opts.fullPage ? await page.addStyleTag({ content: '.topbar,.sticky{position:static!important}' }) : null;
+    // Hide toasts (they'd cover the picture). In stitched full-page shots the
+    // sticky/fixed bars would repeat or float mid-page, so flatten/hide them too.
+    const css = '#toast{display:none!important}' + (opts.fullPage ? '.topbar,.sticky{position:static!important}' + (phone ? '.mainnav{display:none!important}' : '') : '');
+    const tag = await page.addStyleTag({ content: css });
     await page.screenshot({ path: path.join(SHOTS, `${name}-${n}.png`), ...opts });
-    if (tag) await tag.evaluate((t) => t.remove());
+    await tag.evaluate((t) => t.remove());
   };
   const ready = () => page.waitForSelector('html[data-ready="1"]');
   const clip = () => page.evaluate(() => navigator.clipboard.readText());
@@ -328,6 +331,254 @@ async function runSize(browser, name, viewport, phone) {
   await page.waitForSelector('#ds-out');
   check('imported video keeps its description', (await page.textContent('#ds-out')) === preview);
 
+  // ================= v2: Title lab, Shorts, Weekly review, Export =================
+  await page.waitForFunction(() => !document.querySelector('#toast').classList.contains('show'));
+  const todayStr = await page.evaluate(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
+  const plusDays = (iso, n) => {
+    const d = new Date(iso + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  };
+
+  // ---- Title lab
+  await page.goto(BASE + `index.html#/video/${vid}/lab`);
+  await ready();
+  await page.waitForSelector('[data-labtitle="0"]');
+  check('lab: 7 tabs on the video page', (await page.locator('.tabs [data-tab]').count()) === 7);
+  const STRONG = '7 Attic Mistakes That Quietly Rot Your Roof';
+  await page.fill('[data-labtitle="2"]', STRONG);
+  check('lab: strong title scores 100', (await page.textContent('[data-score="2"]')) === '100', await page.textContent('[data-score="2"]'));
+  check('lab: every rule explained (7 reasons)', (await page.locator('[data-score-row="2"] .reasons li').count()) === 7);
+  await page.fill('[data-labtitle="1"]', 'In this video I show you SHOCKING ATTIC ROT');
+  const weakText = await page.textContent('[data-score-row="1"]');
+  check('lab: weak start, clickbait and caps flagged', weakText.includes('Starts weak') && weakText.includes('Clickbait') && weakText.includes('ALL CAPS'), weakText);
+  check('lab: weak title marked red', await page.locator('[data-score-row="1"].bad').count() === 1);
+  check('lab: typing keeps focus in the title box', await page.evaluate(() => document.activeElement.dataset.labtitle === '1'));
+  await page.fill('[data-labthumb="0"]', 'ROOF ROT');
+  check('lab: thumbnail repeating 50%+ of title words is red', (await page.locator('[data-thumb-row="0"].bad').count()) === 1 && (await page.textContent('[data-thumb-row="0"]')).includes('100%'));
+  await page.fill('[data-labthumb="0"]', 'UNBELIEVABLY EXPENSIVE FOUNDATION CATASTROPHE');
+  check('lab: over 20 characters per line is flagged', (await page.locator('.thumbmock.over').count()) === 2 && (await page.textContent('[data-thumb-row="0"]')).includes('Too long for 2 lines'));
+  await page.fill('[data-labthumb="0"]', 'CHECK THIS VENT FIRST');
+  check('lab: word count shown', (await page.textContent('[data-thumb-row="0"]')).includes('4 words'));
+  check('lab: good thumbnail text passes', (await page.locator('[data-thumb-row="0"].good').count()) === 1, await page.textContent('[data-thumb-row="0"]'));
+  const sizes = await page.$$eval('.thumbmock', (els) => els.map((e) => `${Math.round(e.getBoundingClientRect().width)}x${Math.round(e.getBoundingClientRect().height)}`));
+  check('lab: mock previews at 246×138 and 360×202', JSON.stringify(sizes) === JSON.stringify(['246x138', '360x202']), sizes.join(','));
+  const mockLines = await page.$$eval('.thumbmock[data-size="246x138"] .tm-text span', (els) => els.map((e) => e.textContent));
+  check('lab: preview shows the text on 2 lines', JSON.stringify(mockLines) === '["CHECK THIS","VENT FIRST"]', JSON.stringify(mockLines));
+  check('lab: no horizontal page scroll', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+  await shot('v2-01-title-lab', { fullPage: !phone });
+
+  // A/B log
+  await page.click('#ab-add');
+  await page.waitForSelector('[data-ab]');
+  await page.click('#ab-add');
+  await page.waitForFunction(() => document.querySelectorAll('[data-ab]').length === 2);
+  const abRows = page.locator('[data-ab]');
+  check('lab: A/B table scrolls inside its box (no page scroll)', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+  check('lab: A/B rows prefilled with different titles', (await abRows.nth(0).locator('[data-abf="title"]').inputValue()) !== (await abRows.nth(1).locator('[data-abf="title"]').inputValue()));
+  await abRows.nth(1).locator('[data-abf="title"]').fill(STRONG);
+  const fillAb = async (i, vals) => {
+    for (const [k, val] of Object.entries(vals)) await abRows.nth(i).locator(`[data-abf="${k}"]`).fill(String(val));
+  };
+  await fillAb(0, { ctr48: 3.1, views48: 900, ctr7: 4.2, views7: 5100 });
+  await fillAb(1, { ctr48: 4.4, views48: 1200, ctr7: 5.6, views7: 6900 });
+  check('lab: best 7-day CTR wins', (await abRows.nth(1).getAttribute('class')).includes('win') && (await page.textContent('#ab-msg')).includes('best CTR after 7 days'));
+  await abRows.nth(0).locator('[data-abwin]').check();
+  await page.waitForFunction(() => document.querySelector('[data-ab]').classList.contains('win'));
+  check('lab: winner can be marked by hand', (await page.textContent('#ab-msg')).includes('marked by you'));
+  await page.waitForTimeout(300);
+  await page.reload();
+  await ready();
+  await page.waitForSelector('[data-ab]');
+  check('lab: A/B log and titles saved', (await page.locator('[data-ab]').count()) === 2 && (await page.inputValue('[data-labtitle="2"]')) === STRONG && (await page.locator('[data-ab].win [data-abf="ctr7"]').inputValue()) === '4.2');
+  await page.locator('.abtable').scrollIntoViewIfNeeded();
+  await shot('v2-02-ab-log');
+
+  // ---- Shorts tab
+  await page.click('[data-tab="shorts"]');
+  await page.waitForSelector('#sh-gen');
+  await page.click('#sh-fromdesc');
+  check('shorts: chapters pulled from the Description tab', (await page.inputValue('#sh-chapters')).startsWith('0:00 Intro\n0:42 Why attics need to breathe'));
+  await page.click('#sh-gen');
+  const props = await page.$$eval('.proposals li', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ').trim()));
+  check('shorts: one proposal per chapter', props.length === 5, JSON.stringify(props));
+  check('shorts: range = chapter start to min(next, +45 s)', props[0].includes('0:00–0:42 · 42 s') && props[1].includes('0:42–1:27 · 45 s') && props[4].includes('9:05–9:50'), JSON.stringify(props));
+  await page.click('#sh-addprops');
+  await page.waitForFunction(() => document.querySelectorAll('.shortcard').length === 5);
+  check('shorts: 5 Shorts added, "Add" disabled at the limit', await page.isDisabled('#sh-add'));
+  const card2 = page.locator('.shortcard').nth(1);
+  check('shorts: title from chapter name', (await card2.locator('[data-sf="title"]').inputValue()) === 'Why attics need to breathe');
+  await card2.locator('[data-sf="hook"]').fill('This one small vent in your attic decides whether your whole roof rots early');
+  check('shorts: hook over 12 words is flagged', (await card2.locator('[data-cnt="hook"]').textContent()) === '14/12 words' && (await card2.locator('[data-cnt="hook"].bad').count()) === 1);
+  await card2.locator('[data-sf="hook"]').fill('This tiny attic vent decides when your roof rots');
+  check('shorts: hook within 12 words', (await card2.locator('[data-cnt="hook"].bad').count()) === 0);
+  await card2.locator('[data-sf="range"]').fill('0:42-0:50');
+  check('shorts: range under 15 s rejected', (await card2.locator('[data-msg="range"]').textContent()).includes('Only 8 seconds'));
+  await card2.locator('[data-sf="range"]').fill('0:42–1:27');
+  check('shorts: valid range shows duration', (await card2.locator('[data-msg="range"]').textContent()).includes('45 seconds'));
+  await card2.locator('[data-sf="onScreen"]').fill('YOUR ROOF IS SUFFOCATING RIGHT NOW TODAY');
+  check('shorts: on-screen text over 6 words flagged', (await card2.locator('[data-cnt="onScreen"].bad').count()) === 1);
+  await card2.locator('[data-sf="onScreen"]').fill('YOUR ROOF CAN’T BREATHE');
+  await card2.locator('[data-sf="title"]').fill('Kitchen knives ranked');
+  check('shorts: title without a long-video keyword warns', (await card2.locator('[data-msg="title"]').textContent()).includes('No keyword'));
+  await card2.locator('[data-sf="title"]').fill('Your attic must breathe — here’s the 10-second check');
+  check('shorts: title keyword found', (await card2.locator('[data-msg="title"]').textContent()).includes('attic'));
+  await card2.locator('[data-sf="description"]').fill('The full attic video is on the channel.');
+  check('shorts: link line defaults to the free PDF', (await card2.locator('[data-out]').textContent()).endsWith('👉 https://payhip.com/b/hiIm1'));
+  await card2.locator('[data-scopy="desc"]').click();
+  check('shorts: copy description', (await clip()) === 'The full attic video is on the channel.\n\nFREE: The Weekend Home Check (25 things in 30 minutes) 👉 https://payhip.com/b/hiIm1');
+  await card2.locator('[data-sf="status"]').selectOption('posted');
+  await page.waitForFunction(() => document.querySelectorAll('.shortcard')[1].querySelector('[data-sf="status"]').value === 'posted');
+  check('shorts: posted date fills in today', (await page.locator('.shortcard').nth(1).locator('[data-sf="postedDate"]').inputValue()) === todayStr);
+  const card3 = page.locator('.shortcard').nth(2);
+  await card3.locator('[data-sf="postedDate"]').fill(plusDays(todayStr, 3));
+  await card3.locator('[data-sf="status"]').selectOption('cut');
+  await page.waitForFunction(() => document.querySelectorAll('.shortcard')[2].querySelector('[data-sf="status"]').value === 'cut');
+  await page.locator('.shortcard').nth(4).locator('[data-sdel]').click();
+  await page.waitForFunction(() => document.querySelectorAll('.shortcard').length === 4);
+  check('shorts: delete frees a slot', !(await page.isDisabled('#sh-add')));
+  await page.waitForTimeout(300);
+  await page.reload();
+  await ready();
+  await page.waitForSelector('.shortcard');
+  check('shorts: saved after reload', (await page.locator('.shortcard').count()) === 4 && (await page.locator('.shortcard').nth(1).locator('[data-sf="hook"]').inputValue()) === 'This tiny attic vent decides when your roof rots');
+  await shot('v2-03-shorts-tab', { fullPage: !phone });
+  await page.click('[data-tab="checklist"]');
+  await page.waitForSelector('[data-ck]');
+  check('shorts: "Shorts cut from this video" ticked itself', await page.isChecked('[data-ck="c-shorts"]'));
+
+  // ---- Shorts board
+  await page.goto(BASE + 'index.html#/shorts');
+  await ready();
+  await page.waitForSelector('.shorts-board');
+  check('shorts board: 3 status columns', JSON.stringify(await page.$$eval('.shorts-board .column h2', (h) => h.map((x) => x.textContent))) === '["Planned","Cut","Posted"]');
+  check('shorts board: all 4 Shorts listed', (await page.locator('.shortc').count()) === 4);
+  check('shorts board: weekly strip has 7 days', (await page.locator('.weekstrip .wday').count()) === 7);
+  check('shorts board: posted Short on today in the strip', (await page.locator(`.wday[data-day="${todayStr}"] .wchip.posted`).count()) === 1);
+  check('shorts board: no horizontal page scroll', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+  await shot('v2-04-shorts-board', { fullPage: true });
+  await page.locator('.column[data-sstatus="planned"] .shortc').first().locator('select[data-smove]').selectOption('cut');
+  await page.waitForFunction(() => document.querySelectorAll('.column[data-sstatus="cut"] .shortc').length === 2);
+  check('shorts board: status menu moves a card', true);
+  await page.selectOption('#sb-status', 'cut');
+  check('shorts board: status filter', (await page.locator('.shortc').count()) === 2 && (await page.locator('.shorts-board .column').count()) === 1);
+  await page.selectOption('#sb-status', '');
+  await page.click('.chswitch [data-ch="sal"]');
+  check('shorts board: channel filter (Sal has none)', (await page.locator('.shortc').count()) === 0);
+  await page.click('.chswitch [data-ch="both"]');
+  const nextWeekHref = await page.getAttribute('a[aria-label="Previous week"]', 'href');
+  check('shorts board: week navigation', /#\/shorts\?w=\d{4}-W\d{2}/.test(nextWeekHref), nextWeekHref);
+  await page.locator('.shortc .card-title').first().click();
+  await page.waitForSelector('.shortcard');
+  check('shorts board: card opens the video Shorts tab', page.url().includes(`/video/${vid}/shorts`));
+
+  // ---- Weekly review
+  // Make one card old so it shows as "stuck" (shared module instance with the app).
+  await page.evaluate(async (since) => {
+    const s = await import('./js/store.js');
+    const v = s.getVideo('seed-w2');
+    v.statusSince = since;
+    await s.saveVideo(v, { silent: true });
+  }, plusDays(todayStr, -12) + 'T08:00:00.000Z');
+  await page.goto(BASE + 'index.html#/week');
+  await ready();
+  await page.waitForSelector('.week-view');
+  check('week: stuck list shows the 12-day-old card', (await page.textContent('#wk-stuck')).includes('12 days') && (await page.textContent('#wk-stuck')).includes('9 Things to Check Before Winter'));
+  check('week: posted Short counted this week', (await page.textContent('[data-pub="walter"]')).includes('1 Short'));
+  check('week: Short planned in 3 days is coming up', (await page.textContent('#wk-next')).includes('Blocked soffit vents'));
+  await page.fill('#wk-worked', 'Numbers in titles beat questions.');
+  await page.fill('#wk-try', 'Post Shorts at 7 pm ET.');
+  const statRow = page.locator('.statrow[data-vid="seed-w1"]');
+  await statRow.locator('[data-stat="views"]').fill('1200');
+  await statRow.locator('[data-stat="watchHours"]').fill('85.5');
+  await statRow.locator('[data-stat="subs"]').fill('14');
+  await statRow.locator('[data-stat="ctr"]').fill('5.2');
+  await statRow.locator('[data-stat="sales"]').fill('3');
+  await page.waitForTimeout(500);
+  check('week: sparkline shows this week', (await page.textContent('[data-spark="walter"] .sparkval')).includes('1200'));
+  const prevHref = await page.getAttribute('a[aria-label="Previous week"]', 'href');
+  await page.goto(BASE + 'index.html' + prevHref);
+  await ready();
+  await page.waitForSelector('.week-view');
+  check('week: notes are per week', (await page.inputValue('#wk-worked')) === '');
+  await page.locator('.statrow[data-vid="seed-w1"] [data-stat="views"]').fill('900');
+  await page.waitForTimeout(500);
+  await page.goto(BASE + 'index.html#/week');
+  await ready();
+  await page.waitForSelector('.week-view');
+  check('week: notes saved for this week', (await page.inputValue('#wk-worked')) === 'Numbers in titles beat questions.' && (await page.inputValue('#wk-try')) === 'Post Shorts at 7 pm ET.');
+  check('week: stats saved', (await page.inputValue('.statrow[data-vid="seed-w1"] [data-stat="ctr"]')) === '5.2');
+  check('week: sparkline is an inline SVG line over 2 weeks', (await page.locator('[data-spark="walter"] svg polyline').count()) === 1);
+  check('week: no horizontal page scroll', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+  await shot('v2-05-weekly-review', { fullPage: true });
+  await page.selectOption('#wk-metric', 'sales');
+  check('week: trend metric switch', (await page.textContent('[data-spark="walter"]')).includes('Sales'));
+
+  // ---- Settings: title lab word lists
+  await page.goto(BASE + 'index.html#/settings?s=lab');
+  await ready();
+  await page.click('[data-pick="walter"]');
+  check('settings: Walter keywords seeded', (await page.inputValue('#lab-keywords')).split('\n').join(',') === 'home inspection,house,homeowner,buying a house,winter,basement,roof');
+  await page.fill('#lab-keywords', (await page.inputValue('#lab-keywords')) + '\nattic');
+  await page.fill('#lab-power', (await page.inputValue('#lab-power')) + '\nquietly');
+  await page.waitForTimeout(500);
+  await shot('v2-06-settings-title-lab', { fullPage: !phone });
+  await page.goto(BASE + `index.html#/video/${vid}/lab`);
+  await ready();
+  await page.waitForSelector('[data-score-row="0"]');
+  check('settings: edited keyword list used by the lab', (await page.textContent('[data-score-row="0"]')).includes('Channel keyword: roof, attic'), await page.textContent('[data-score-row="0"]'));
+
+  // ---- Export: JSON backup has the new tables; CSV zip opens in Python
+  await page.goto(BASE + 'index.html#/settings?s=backup');
+  await ready();
+  const [bk2] = await Promise.all([page.waitForEvent('download'), page.click('#bk-export')]);
+  const bk2Path = path.join(os.tmpdir(), `cs-backup-v2-${name}.json`);
+  await bk2.saveAs(bk2Path);
+  const data2 = JSON.parse(fs.readFileSync(bk2Path, 'utf8'));
+  check('backup v2: has Shorts, A/B log, weekly notes, stats', data2.version === 2 && data2.shorts.length === 4 && data2.abtests.length === 2 && data2.weekly.length === 1 && data2.stats.length === 2 && data2.settings.titleWords.power.includes('quietly'), JSON.stringify({ v: data2.version, s: data2.shorts?.length, a: data2.abtests?.length, w: data2.weekly?.length, st: data2.stats?.length }));
+  const [zipDl] = await Promise.all([page.waitForEvent('download'), page.click('#bk-csv')]);
+  check('csv: zip file name', /^channel-studio-csv-\d{4}-\d{2}-\d{2}\.zip$/.test(zipDl.suggestedFilename()), zipDl.suggestedFilename());
+  const zipPath = path.join(os.tmpdir(), `cs-export-${name}.zip`);
+  await zipDl.saveAs(zipPath);
+  let py = {};
+  try {
+    py = JSON.parse(execFileSync('python3', ['-I', path.join(__dirname, 'check_zip.py'), zipPath], { encoding: 'utf8' }));
+  } catch (e) {
+    py = { error: String(e.stdout || e.message) };
+  }
+  check('csv: Python opens the zip (testzip OK, stored)', py.testzip === null && py.methods && py.methods.every((m) => m === 0), JSON.stringify(py));
+  check('csv: one CSV per table', JSON.stringify(py.names) === JSON.stringify(['videos.csv', 'shorts.csv', 'ab_log.csv', 'weekly_notes.csv', 'stats.csv']), JSON.stringify(py.names));
+  check('csv: row counts match', JSON.stringify(py.rows) === JSON.stringify({ 'videos.csv': 7, 'shorts.csv': 4, 'ab_log.csv': 2, 'weekly_notes.csv': 1, 'stats.csv': 2 }), JSON.stringify(py.rows));
+  check('csv: content survives (quotes, emoji, UTF-8)', py.sample && py.sample.short_title === 'Your attic must breathe — here’s the 10-second check' && py.sample.stats_ctr === '5.2' && py.sample.note === 'Numbers in titles beat questions.', JSON.stringify(py.sample));
+  await shot('v2-07-export');
+  // Restore from the v2 backup after a reset: everything comes back.
+  await page.click('#bk-reset');
+  await page.goto(BASE + 'index.html#/shorts');
+  await ready();
+  check('reset clears Shorts', (await page.locator('.shortc').count()) === 0);
+  await page.goto(BASE + 'index.html#/settings?s=backup');
+  await ready();
+  await page.setInputFiles('#bk-import', bk2Path);
+  check('import v2 backup', await toastSays('Backup restored'));
+  await page.goto(BASE + 'index.html#/shorts');
+  await ready();
+  check('import brings Shorts back', (await page.locator('.shortc').count()) === 4);
+  // An old (v1) backup still imports.
+  await page.goto(BASE + 'index.html#/settings?s=backup');
+  await ready();
+  await page.setInputFiles('#bk-import', bkPath);
+  check('old v1 backup still imports', await toastSays('Backup restored'));
+  await page.goto(BASE + 'index.html#/board');
+  await ready();
+  check('v1 import keeps the videos', (await page.locator('.card').count()) === 7);
+  await page.goto(BASE + 'index.html#/settings?s=backup');
+  await ready();
+  await page.setInputFiles('#bk-import', bk2Path);
+  await toastSays('Backup restored');
+
   // ---- Offline reload
   await page.evaluate(() => navigator.serviceWorker.ready);
   await page.reload();
@@ -342,6 +593,12 @@ async function runSize(browser, name, viewport, phone) {
   await page.goto(BASE + `index.html#/video/${vid}/prompt`);
   await page.waitForSelector('#pr-out');
   check('offline: prompt still works', (await page.textContent('#pr-out')).endsWith(LAST));
+  await page.goto(BASE + 'index.html#/shorts');
+  await page.waitForSelector('.shortc');
+  check('offline: Shorts board works', (await page.locator('.shortc').count()) === 4);
+  await page.goto(BASE + 'index.html#/week');
+  await page.waitForSelector('.week-view');
+  check('offline: weekly review works', (await page.inputValue('#wk-worked')) === 'Numbers in titles beat questions.');
   await ctx.setOffline(false);
 
   // ---- Dark mode
@@ -354,6 +611,14 @@ async function runSize(browser, name, viewport, phone) {
   await page.waitForSelector('#ds-out');
   await shot('16-description-dark');
   check('no horizontal page scroll (detail)', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+  await page.goto(BASE + `index.html#/video/${vid}/lab`);
+  await ready();
+  await page.waitForSelector('.thumbmock');
+  await shot('v2-08-title-lab-dark');
+  await page.goto(BASE + 'index.html#/week');
+  await ready();
+  await page.waitForSelector('.week-view');
+  await shot('v2-09-weekly-review-dark');
   await page.emulateMedia({ colorScheme: 'light' });
 
   // ---- Self-tests page
@@ -367,6 +632,73 @@ async function runSize(browser, name, viewport, phone) {
   await ctx.close();
 }
 
+// Open the app on top of a database made by version 1 (two stores only) and
+// check every old record survives the upgrade and the new screens work.
+async function runUpgrade(browser) {
+  console.log('\n=== upgrade from the v1 database ===');
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await page.goto(BASE + 'icons/icon.svg');
+  await page.evaluate(async () => {
+    const req = indexedDB.open('channel-studio', 1);
+    req.onupgradeneeded = () => {
+      req.result.createObjectStore('videos', { keyPath: 'id' });
+      req.result.createObjectStore('kv', { keyPath: 'key' });
+    };
+    const db = await new Promise((res, rej) => {
+      req.onsuccess = () => res(req.result);
+      req.onerror = () => rej(req.error);
+    });
+    const tx = db.transaction(['videos', 'kv'], 'readwrite');
+    const base = { titles: ['', '', ''], chosenTitle: 0, thumbTexts: ['BIG CRACK', ''], lengthMin: 10, wpm: null, publishTime: '', order: 0, prompt: { points: 'One\nTwo' }, description: { hook: 'Old hook.' }, checklist: { 'c-title': true }, notes: { text: 'old note', scriptDoc: '', headcast: '', thumbPath: '' }, pinned: null, community: null, createdAt: '2026-09-01T09:00:00.000Z', updatedAt: '2026-09-02T09:00:00.000Z' };
+    tx.objectStore('videos').put({ ...base, id: 'v-old1', channel: 'walter', title: 'Basement Cracks Explained', titles: ['Basement Cracks Explained', '', ''], status: 'script', publishDate: '', product: 'w-manual' });
+    tx.objectStore('videos').put({ ...base, id: 'v-old2', channel: 'sal', title: 'My Old Sal Video', titles: ['My Old Sal Video', '', ''], status: 'published', publishDate: '2026-09-15', product: 's-copycat' });
+    tx.objectStore('kv').put({ key: 'seeded', value: true });
+    tx.objectStore('kv').put({ key: 'theme', value: 'system' });
+    tx.objectStore('kv').put({ key: 'checklist', value: [{ id: 'c-title', text: 'My own checklist item' }] });
+    tx.objectStore('kv').put({ key: 'channels', value: { walter: { id: 'walter', signOff: 'Old custom sign-off', products: [{ id: 'w-manual', name: 'The Home Check Manual', line: 'Manual', url: 'https://payhip.com/b/ABaxT', price: 17, type: 'paid', emoji: '📖', inDescription: true, order: 1 }] } } });
+    await new Promise((r) => (tx.oncomplete = r));
+    db.close();
+  });
+  await page.goto(BASE + 'index.html#/board');
+  await page.waitForSelector('html[data-ready="1"]');
+  await page.waitForSelector('.card');
+  check('upgrade: old videos still on the board', (await page.locator('.card').count()) === 2 && (await page.textContent('#board')).includes('Basement Cracks Explained'));
+  const info = await page.evaluate(async () => {
+    const db = await new Promise((res) => {
+      const r = indexedDB.open('channel-studio');
+      r.onsuccess = () => res(r.result);
+    });
+    const out = { version: db.version, stores: [...db.objectStoreNames].sort() };
+    db.close();
+    return out;
+  });
+  check('upgrade: database is version 2 with the new stores', info.version === 2 && JSON.stringify(info.stores) === JSON.stringify(['abtests', 'kv', 'shorts', 'stats', 'videos', 'weekly']), JSON.stringify(info));
+  await page.goto(BASE + 'index.html#/video/v-old1/notes');
+  await page.waitForSelector('[data-note="text"]');
+  check('upgrade: old notes kept', (await page.inputValue('[data-note="text"]')) === 'old note');
+  await page.goto(BASE + 'index.html#/video/v-old1/checklist');
+  await page.waitForSelector('[data-ck]');
+  check('upgrade: custom checklist kept', (await page.textContent('.checklist')).includes('My own checklist item') && (await page.isChecked('[data-ck="c-title"]')));
+  await page.goto(BASE + 'index.html#/settings');
+  await page.waitForSelector('[data-c="signOff"]');
+  check('upgrade: custom channel settings kept', (await page.inputValue('[data-c="signOff"]')) === 'Old custom sign-off');
+  await page.goto(BASE + 'index.html#/video/v-old1/lab');
+  await page.waitForSelector('[data-score-row="0"]');
+  check('upgrade: title lab works on old data (keywords added)', (await page.textContent('[data-score-row="0"]')).includes('Channel keyword: basement'));
+  await page.goto(BASE + 'index.html#/video/v-old1/shorts');
+  await page.click('#sh-add');
+  await page.waitForSelector('.shortcard');
+  await page.goto(BASE + 'index.html#/week');
+  await page.waitForSelector('.week-view');
+  check('upgrade: weekly review lists the old published video', (await page.locator('.statrow[data-vid="v-old2"]').count()) === 1);
+  check('upgrade: no console errors', errors.length === 0, errors.join('\n      '));
+  await ctx.close();
+}
+
 (async () => {
   fs.mkdirSync(SHOTS, { recursive: true });
   const server = await serve();
@@ -374,6 +706,7 @@ async function runSize(browser, name, viewport, phone) {
   try {
     await runSize(browser, 'desktop', { width: 1440, height: 900 }, false);
     await runSize(browser, 'phone', { width: 390, height: 844 }, true);
+    await runUpgrade(browser);
   } catch (e) {
     check('run finished without crashing', false, e.stack);
   } finally {
