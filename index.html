@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Channel Studio</title>
+    <meta name="description" content="Private production desk for Walter's Home Check and Chef Sal Romano." />
+    <meta name="theme-color" content="#1b1d21" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Channel Studio" />
+    <link rel="stylesheet" href="css/app.css" />
+    <script>
+      // Apply the saved theme before first paint (no flash).
+      try {
+        var t = localStorage.getItem('cs:theme');
+        if (t) {
+          t = JSON.parse(t);
+          if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+        }
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <a class="skip" href="#view">Skip to content</a>
+    <header class="topbar">
+      <a class="brand" href="#/board" aria-label="Channel Studio home">
+        <img src="icons/icon.svg" alt="" width="28" height="28" />
+        <span>Channel Studio</span>
+      </a>
+      <div class="chswitch" role="group" aria-label="Show channel">
+        <button type="button" data-ch="walter">Walter</button>
+        <button type="button" data-ch="sal">Sal</button>
+        <button type="button" data-ch="both">Both</button>
+      </div>
+      <nav class="mainnav" aria-label="Main">
+        <a href="#/board" data-nav="board"><span class="ico" aria-hidden="true">▦</span>Board</a>
+        <a href="#/calendar" data-nav="calendar"><span class="ico" aria-hidden="true">▤</span>Calendar</a>
+        <a href="#/topics" data-nav="topics"><span class="ico" aria-hidden="true">≡</span>Topics</a>
+        <a href="#/settings" data-nav="settings"><span class="ico" aria-hidden="true">⚙</span>Settings</a>
+      </nav>
+    </header>
+    <main id="view" tabindex="-1"><p class="loading">Loading…</p></main>
+    <div id="toast" role="status" aria-live="polite"></div>
+    <noscript>Channel Studio needs JavaScript turned on.</noscript>
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>
