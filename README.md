@@ -243,3 +243,62 @@ Everything should show green ✓.
 | ![](docs/screens/desktop-v2-04-shorts-board.png) | ![](docs/screens/phone-v2-04-shorts-board.png) |
 | ![](docs/screens/desktop-v2-07-export.png) | ![](docs/screens/phone-v2-05-weekly-review.png) |
 | ![](docs/screens/desktop-v2-08-title-lab-dark.png) | ![](docs/screens/phone-v2-09-weekly-review-dark.png) |
+
+---
+
+# Faceless Creator Kit
+
+A separate, sellable app for **other** creators, in the `kit/` folder. It is a generic,
+clean version of Channel Studio (the **Channel Planner**) plus a **Pin Factory** that makes
+Pinterest pins in the browser. It has its own look, its own data, its own offline worker and
+its own install icon — it shares nothing with Channel Studio, so changing one never breaks
+the other. Nothing about Walter or Sal is in it.
+
+**Address (once GitHub Pages is on):** https://plazzers.github.io/channel-studio/kit/
+
+![Kit cover](kit/sales/cover-1280x720.png)
+
+## What buyers get
+- **Access gate:** the first screen asks for an access code from their PDF guide.
+- **Channel Planner:** any number of channels; board (Idea → Script → Voice/Avatar → Edit →
+  Thumbnail → Scheduled → Published), calendar, topics bank, prompt builder with 3 templates
+  (they can edit them and add their own with a fixed ending line), description builder, title
+  & thumbnail lab with an explained score, Shorts planner, weekly review with trend lines,
+  backup/restore and CSV export. A 3-step welcome and a demo channel they can delete.
+- **Pin Factory:** brand kit per channel (colors, 6 fonts, logo in a circle, footer, CTA), 8
+  pin templates (1000×1500), single-pin editor with undo/duplicate, batch mode (paste a sheet
+  or upload a CSV), and export to a ZIP of PNG/JPG images + a Pinterest bulk-upload CSV with
+  image links, UTM tags, a schedule and length checks.
+
+## Selling it — what you (or your assistant) do
+1. **Make access codes** (on your Mac, in the repo folder):
+   `python3 kit/tools/make_codes.py --count 50 --out ~/Desktop/kit-codes.txt`
+   It saves the codes in that file (keep it private — never put it in the repo) and prints a
+   list of hashes. Paste the hashes into `ACCESS_HASHES` in `kit/config.js`, commit and push.
+   The list is empty now, so **no code works until you do this**.
+2. **Make each buyer's PDF** with their code in it:
+   `python3 kit/tools/make_access_pdf.py --code KIT-XXXX-XXXX --out ~/Desktop/Guide-KIT-XXXX-XXXX.pdf`
+   (needs `pip3 install reportlab pillow` once).
+3. **Payhip listing:** text in `kit/sales/payhip-description.md` (add your own refund
+   wording), images `kit/sales/cover-1280x720.png`, `cover-square-1400.png` and
+   `feature-1…6-*.png`. The general guide without a code is
+   `kit/sales/Faceless-Creator-Kit-Guide.pdf` (made from `kit/sales/buyer-guide.md`).
+
+The code check happens in the browser, so it keeps honest people honest — it is not strong
+copy protection.
+
+## For a developer
+- Plain HTML/CSS/JS modules, no build, no network calls at runtime. Data in IndexedDB
+  (`faceless-creator-kit`). Fonts (OFL) are in `kit/fonts/`.
+- Test mode: on `localhost`, open `kit/?testcode=1` and use `KIT-TEST-0000`.
+- If you change kit files, bump `VERSION` in `kit/sw.js` (now `fck-v1`).
+- Unit tests: `node --test kit/tests/unit.test.mjs` · Browser test at 1440×900 and 390×844:
+  `node kit/tests/e2e.cjs` (screenshots in `kit/docs/screens/`, the export ZIP and CSV are
+  opened and checked with Python).
+- Rebuild sales material: `node kit/tools/make_sales_images.cjs` and
+  `python3 kit/tools/build_guide.py`.
+
+| Desktop | Phone |
+|---|---|
+| ![](kit/docs/screens/desktop-16-batch-grid.png) | ![](kit/docs/screens/phone-09-board.png) |
+| ![](kit/docs/screens/desktop-18-export.png) | ![](kit/docs/screens/phone-11-pin-list.png) |

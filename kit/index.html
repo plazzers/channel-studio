@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Faceless Creator Kit</title>
+    <meta name="description" content="Plan faceless YouTube videos and make Pinterest pins in bulk. Works offline; your data stays on your device." />
+    <meta name="theme-color" content="#1C1A27" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Creator Kit" />
+    <link rel="preload" href="fonts/inter-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="fonts/space-grotesk-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="css/kit.css" />
+    <script>
+      // Apply the saved theme before first paint (no flash).
+      try {
+        var t = JSON.parse(localStorage.getItem('fck:theme') || 'null');
+        if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <a class="skip" href="#view">Skip to content</a>
+    <section id="gate" class="gate" hidden aria-labelledby="gate-title">
+      <div class="gate-card">
+        <img src="icons/icon.svg" alt="" width="64" height="64" />
+        <p class="eyebrow">Faceless Creator Kit</p>
+        <h1 id="gate-title">Enter your access code</h1>
+        <p class="muted">You'll find it in the PDF guide that came with your purchase. It looks like <code>KIT-XXXX-XXXX</code>.</p>
+        <form id="gate-form" autocomplete="off">
+          <label for="gate-code" class="sr">Access code</label>
+          <input id="gate-code" name="code" placeholder="KIT-XXXX-XXXX" autocapitalize="characters" spellcheck="false" required />
+          <button class="btn primary big" type="submit">Unlock</button>
+          <p id="gate-msg" class="gate-msg" role="alert"></p>
+        </form>
+        <p class="tiny muted">The code is checked on this device. Nothing is sent anywhere.</p>
+      </div>
+    </section>
+    <div id="app" class="shell" hidden>
+      <header class="topbar">
+        <a class="brand" href="#/board" aria-label="Faceless Creator Kit home">
+          <img src="icons/icon.svg" alt="" width="30" height="30" />
+          <span>Creator Kit</span>
+        </a>
+        <label class="chpick"><span class="sr">Show channel</span><select id="chpick"></select></label>
+        <button class="iconbtn" id="themebtn" type="button" aria-label="Switch light/dark theme" title="Light / dark"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg></button>
+      </header>
+      <nav class="side" aria-label="Main">
+        <p class="navgroup">Channel Planner</p>
+        <a href="#/board" data-nav="board"><span class="ico" aria-hidden="true">▦</span>Board</a>
+        <a href="#/calendar" data-nav="calendar"><span class="ico" aria-hidden="true">▤</span>Calendar</a>
+        <a href="#/topics" data-nav="topics"><span class="ico" aria-hidden="true">✦</span>Topics</a>
+        <a href="#/week" data-nav="week"><span class="ico" aria-hidden="true">↗</span>Weekly review</a>
+        <p class="navgroup">Pin Factory</p>
+        <a href="#/pins" data-nav="pins"><span class="ico" aria-hidden="true">◧</span>Pins</a>
+        <a href="#/batch" data-nav="batch"><span class="ico" aria-hidden="true">⊞</span>Batch</a>
+        <a href="#/export" data-nav="export"><span class="ico" aria-hidden="true">⇩</span>Export</a>
+        <a href="#/brand" data-nav="brand"><span class="ico" aria-hidden="true">◉</span>Brand kit</a>
+        <p class="navgroup">Setup</p>
+        <a href="#/channels" data-nav="channels"><span class="ico" aria-hidden="true">⚙</span>Channels</a>
+        <a href="#/templates" data-nav="templates"><span class="ico" aria-hidden="true">✎</span>Prompt templates</a>
+        <a href="#/backup" data-nav="backup"><span class="ico" aria-hidden="true">⟲</span>Backup</a>
+      </nav>
+      <main id="view" tabindex="-1"><p class="loading">Loading…</p></main>
+    </div>
+    <div id="toast" role="status" aria-live="polite"></div>
+    <noscript>Faceless Creator Kit needs JavaScript turned on.</noscript>
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>
