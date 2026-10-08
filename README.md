@@ -11,6 +11,10 @@ at every week.
 - Works **offline** after the first visit.
 - Search engines are told not to list it.
 
+> **Shorts Factory (Mac tool):** turn one long video into 5–8 ready-to-post Shorts with
+> captions, hook bar, cover, title and description — see
+> [shorts_factory/README.md](shorts_factory/README.md).
+
 ![Board](docs/screens/desktop-03-board-moved.png)
 
 ---
