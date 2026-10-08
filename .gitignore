@@ -1,2 +1,3 @@
 # Access code lists must never be committed (Faceless Creator Kit).
 *codes*.txt
+__pycache__/
